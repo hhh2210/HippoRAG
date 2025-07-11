@@ -7,6 +7,7 @@ from tqdm import tqdm
 from transformers import AutoModel
 from openai import OpenAI
 from openai import AzureOpenAI
+import os
 
 from ..utils.config_utils import BaseConfig
 from ..utils.logging_utils import get_logger
@@ -32,6 +33,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
 
         if self.global_config.azure_embedding_endpoint is None:
             self.client = OpenAI(
+                api_key=os.environ.get("OPENAI_API_KEY"),
                 base_url=self.global_config.embedding_base_url
             )
         else:
@@ -102,8 +104,10 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
                 batch = texts[i:i + batch_size]
                 try:
                     results.append(self.encode(batch))
-                except:
-                    import ipdb; ipdb.set_trace()
+                except Exception as e:
+                    logger.error(f"An error occurred during batch encoding: {e}")
+                    # Re-raise the exception to be handled by the caller
+                    raise e
                 pbar.update(batch_size)
             pbar.close()
             results = np.concatenate(results)

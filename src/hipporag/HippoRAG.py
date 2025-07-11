@@ -32,6 +32,8 @@ from .utils.misc_utils import NerRawOutput, TripleRawOutput
 from .utils.embed_utils import retrieve_knn
 from .utils.typing import Triple
 from .utils.config_utils import BaseConfig
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+import tiktoken
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +231,16 @@ class HippoRAG:
         if self.global_config.openie_mode == 'offline':
             self.pre_openie(docs)
 
-        self.chunk_embedding_store.insert_strings(docs)
+        encoding = tiktoken.get_encoding("cl100k_base")
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=5120,
+            chunk_overlap=50,
+            length_function=lambda x: len(encoding.encode(x)),
+        )
+
+        chunks = text_splitter.split_text("\n\n".join(docs))
+
+        self.chunk_embedding_store.insert_strings(chunks)
         chunk_to_rows = self.chunk_embedding_store.get_all_id_to_rows()
 
         all_openie_info, chunk_keys_to_process = self.load_existing_openie(chunk_to_rows.keys())
@@ -360,7 +371,7 @@ class HippoRAG:
     def retrieve(self,
                  queries: List[str],
                  num_to_retrieve: int = None,
-                 gold_docs: List[List[str]] = None) -> List[QuerySolution] | Tuple[List[QuerySolution], Dict]:
+                 gold_docs: List[List[str]] = None) -> Union[List[QuerySolution], Tuple[List[QuerySolution], Dict]]:
         """
         Performs retrieval using the HippoRAG 2 framework, which consists of several steps:
         - Fact Retrieval
@@ -446,7 +457,7 @@ class HippoRAG:
             return retrieval_results
 
     def rag_qa(self,
-               queries: List[str|QuerySolution],
+               queries: List[Union[str, QuerySolution]],
                gold_docs: List[List[str]] = None,
                gold_answers: List[List[str]] = None) -> Tuple[List[QuerySolution], List[str], List[Dict]] | Tuple[List[QuerySolution], List[str], List[Dict], Dict, Dict]:
         """
@@ -522,7 +533,7 @@ class HippoRAG:
     def retrieve_dpr(self,
                      queries: List[str],
                      num_to_retrieve: int = None,
-                     gold_docs: List[List[str]] = None) -> List[QuerySolution] | Tuple[List[QuerySolution], Dict]:
+                     gold_docs: List[List[str]] = None) -> Union[List[QuerySolution], Tuple[List[QuerySolution], Dict]]:
         """
         Performs retrieval using a DPR framework, which consists of several steps:
         - Dense passage scoring
@@ -591,7 +602,7 @@ class HippoRAG:
             return retrieval_results
 
     def rag_qa_dpr(self,
-               queries: List[str|QuerySolution],
+               queries: List[Union[str, QuerySolution]],
                gold_docs: List[List[str]] = None,
                gold_answers: List[List[str]] = None) -> Tuple[List[QuerySolution], List[str], List[Dict]] | Tuple[List[QuerySolution], List[str], List[Dict], Dict, Dict]:
         """
